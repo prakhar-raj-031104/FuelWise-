@@ -70,7 +70,7 @@ detected and executed without an LLM call, so they're instant.
 | ------------ | ------------------------------------------------------- |
 | Frontend     | React 18, TypeScript, Vite, `react-markdown`, nginx     |
 | Backend      | Python 3.12, FastAPI, Uvicorn, pydantic-settings        |
-| LLM runtime  | Ollama (`llama3.2:1b` by default, tool/function-capable) |
+| LLM runtime  | Ollama (`llama3.2` by default; `llama3.2:1b` for speed) |
 | Streaming    | Server-Sent Events (SSE)                                |
 | Persistence  | JSONL ratings log (Docker volume)                       |
 | Packaging    | Docker, Docker Compose                                   |
@@ -178,7 +178,7 @@ fuelwise/
 ## Performance Notes
 
 On CPU-only machines, FuelWise is tuned to feel responsive:
-- A **small, warm-kept model** (`llama3.2:1b`, `keep_alive=30m`) avoids cold reloads.
+- A **warm-kept model** (`keep_alive=30m`) avoids cold reloads between messages.
 - **Context grounding** lets the model answer in a single pass (no slow tool round-trips).
 - **Streaming** surfaces the first words in well under a second.
 - A **bounded answer length** keeps full replies near ~5 seconds.

@@ -29,14 +29,15 @@ docker compose up --build
 
 First boot pulls the model (a few minutes). Then open **http://localhost**.
 
-Want higher-quality (but slower on CPU) answers? Set `OLLAMA_MODEL=llama3.2`
-in `.env` before starting.
+Need maximum speed on weak hardware? Set `OLLAMA_MODEL=llama3.2:1b` in `.env`
+(faster, but more rambling and less accurate).
 
 ### Latency
 
-On CPU-only machines the default is `llama3.2:1b` and replies **stream token by
-token** (first words in ~1–2s) so chat feels instant. Tuning knobs (env vars):
-`OLLAMA_MODEL`, `OLLAMA_NUM_PREDICT` (answer length cap, default 220),
+The default `llama3.2` (3B) answers in a single grounded, **streamed** pass:
+the first words appear in ~1–1.5s and a complete reply lands in ~5–7s on CPU.
+Tuning knobs (env vars): `OLLAMA_MODEL`, `OLLAMA_NUM_PREDICT` (answer-length
+safety cap, default 300), `OLLAMA_TEMPERATURE` (default 0.3), and
 `OLLAMA_KEEP_ALIVE` (keeps the model warm, default `30m`). A working GPU makes
 all of this several times faster.
 
@@ -48,7 +49,7 @@ docker compose restart backend   # ratings survive
 
 ## Local development (without Docker)
 
-Requires a running Ollama (`ollama serve` + `ollama pull llama3.2:1b`).
+Requires a running Ollama (`ollama serve` + `ollama pull llama3.2`).
 
 **Backend:**
 ```bash
@@ -83,7 +84,7 @@ Interactive docs at `/docs` (e.g. http://localhost:8000/docs in dev).
 | Var | Default | Notes |
 |-----|---------|-------|
 | `OLLAMA_HOST` | `http://localhost:11434` | set to `http://ollama:11434` in compose |
-| `OLLAMA_MODEL` | `llama3.2:1b` | model to use/pull (`llama3.2` for higher quality) |
+| `OLLAMA_MODEL` | `llama3.2` | model to use/pull (`llama3.2:1b` for more speed) |
 | `RATING_LOG` | `/tmp/mess_menu_ratings.jsonl` | JSONL ratings file (volume in prod) |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost` | comma-separated allowed origins |
 

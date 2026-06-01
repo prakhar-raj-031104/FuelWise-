@@ -1,0 +1,59 @@
+# FuelWise full stack: Ollama (local LLM) + FastAPI backend + React/nginx frontend.
+#
+#   docker compose up --build
+#
+# First boot pulls the model (a few minutes / GBs), then the app is at
+# http://localhost  (override the port with FRONTEND_PORT in .env).
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: pulls the model into the shared volume, then exits.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull ${OLLAMA_MODEL:-llama3.2:1b}"]
+    restart: "no"
+
+  backend:
+    build: ./app/backend
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+      RATING_LOG: /data/mess_menu_ratings.jsonl
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:${FRONTEND_PORT:-80}}
+    volumes:
+      - ratings-data:/data
+    restart: unless-stopped
+
+  frontend:
+    build: ./app/frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    restart: unless-stopped
+
+volumes:
+  ollama-models:
+  ratings-data:

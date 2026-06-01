@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     # Keep the model warm in RAM between requests (avoids ~5s cold reloads).
     ollama_keep_alive: str = "30m"
     # Cap answer length so replies stay fast and concise on CPU.
-    ollama_num_predict: int = 220
+    # ~128 tokens keeps a full answer near ~5s on a CPU-only 1B model;
+    # streaming means the first words still appear in well under a second.
+    ollama_num_predict: int = 128
 
     # Ratings storage (JSONL). Backed by a Docker volume in production.
     rating_log: Path = Path("/tmp/mess_menu_ratings.jsonl")

@@ -13,15 +13,15 @@ in the original. Exceptions are unchanged so callers can map them to HTTP.
 """
 
 import json
+import re
 import urllib.error
 import urllib.request
 from datetime import date
-from typing import Any
+from typing import Any, Optional
 
-from app.agent.data import GOAL_GUIDES, NUTRITION_DB, WEEKLY_MENU
-from app.agent.definitions import TOOL_DEFINITIONS
+from app.agent.data import ALL_DISHES, GOAL_GUIDES, NUTRITION_DB, OUTSIDE_OPTIONS, WEEKLY_MENU
 from app.agent.errors import OllamaAPIError, OllamaModelMissing, OllamaNotRunning
-from app.agent.tools import TOOL_FUNCTIONS
+from app.agent.tools import TOOL_FUNCTIONS, log_meal_rating, normalise
 
 SYSTEM_PROMPT = (
     "You are FuelWise, a practical food-planning agent for IIT Bhilai hostel students. "
@@ -31,7 +31,9 @@ SYSTEM_PROMPT = (
     "for example to log a meal rating or to suggest outside-campus food by budget. "
     "If no goal is provided, assume maintain. If allergies are mentioned, avoid matching allergens. "
     "Do not invent calorie or protein values beyond what the context lists. "
-    "Keep answers concise (a few sentences), friendly, and campus-realistic. Avoid medical claims."
+    "Answer in 2-4 short sentences. Name specific dishes from today's menu. "
+    "Do NOT output long bullet lists, tables, or nutrition breakdowns unless explicitly asked. "
+    "Be friendly and campus-realistic. Avoid medical claims."
 )
 
 MAX_TOOL_ITERATIONS = 6
@@ -61,7 +63,41 @@ def build_today_context() -> str:
     for goal, (summary, plate_rule, *_rest) in GOAL_GUIDES.items():
         lines.append(f"- {goal}: {summary} {plate_rule}")
 
+    lines += ["", "Outside-campus options (when mess food is weak):"]
+    for opt in OUTSIDE_OPTIONS:
+        tags = " ".join(sorted(opt["tags"]))
+        lines.append(f"- {opt['name']} - Rs {opt['price']} ({tags}): {opt['reason']}")
+
     return "\n".join(lines)
+
+
+_RATING_RE = re.compile(r"([1-5])\s*(?:/\s*5|out of\s*5|stars?|star)?", re.IGNORECASE)
+
+
+def _find_dish_in_text(message: str) -> Optional[str]:
+    """Find a known dish mentioned anywhere in a sentence (longest match wins)."""
+    norm = normalise(message)
+    for dish in sorted(ALL_DISHES, key=len, reverse=True):
+        if normalise(dish) in norm:
+            return dish
+    return None
+
+
+def detect_rating(message: str) -> Optional[dict[str, Any]]:
+    """Deterministic shortcut for 'log/rate <dish> as N' so rating-logging is
+    instant and never depends on the model emitting a tool call."""
+    text = message.lower()
+    if not any(word in text for word in ("log", "rate", "rating")):
+        return None
+    dish = _find_dish_in_text(message)
+    if not dish:
+        return None
+    match = _RATING_RE.search(text)
+    if not match:
+        return None
+    rating = int(match.group(1))
+    result = log_meal_rating(dish, rating)
+    return {"tool": "log_meal_rating", "args": {"dish": dish, "rating": rating}, "result": result}
 
 
 def parse_arguments(arguments: Any) -> dict[str, Any]:
@@ -95,10 +131,14 @@ class MessMenuAgent:
         self.options = {"num_predict": num_predict, "temperature": temperature}
 
     def _payload(self, messages: list[dict[str, Any]], stream: bool) -> bytes:
+        # Tools are intentionally NOT sent: all the data the model needs is
+        # injected into the context (see build_today_context), so it answers in
+        # a single prose pass. This avoids a second CPU generation and the
+        # malformed tool-call JSON that small models (e.g. llama3.2:1b) emit.
+        # Rating-logging is handled deterministically via detect_rating().
         payload = {
             "model": self.model,
             "messages": messages,
-            "tools": TOOL_DEFINITIONS,
             "stream": stream,
             "keep_alive": self.keep_alive,
             "options": self.options,
@@ -157,6 +197,11 @@ class MessMenuAgent:
         messages.append({"role": "user", "content": user_message})
         trace: list[dict[str, Any]] = []
 
+        shortcut = detect_rating(user_message)
+        if shortcut:
+            messages.append({"role": "assistant", "content": shortcut["result"]})
+            return {"reply": shortcut["result"], "messages": messages, "trace": [shortcut]}
+
         for _ in range(MAX_TOOL_ITERATIONS):
             message = self.chat(messages).get("message", {})
             messages.append(message)
@@ -188,6 +233,14 @@ class MessMenuAgent:
         `messages` is mutated in place so the caller can persist the session.
         """
         messages.append({"role": "user", "content": user_message})
+
+        shortcut = detect_rating(user_message)
+        if shortcut:
+            messages.append({"role": "assistant", "content": shortcut["result"]})
+            yield {"type": "tool", **{k: shortcut[k] for k in ("tool", "args", "result")}}
+            yield {"type": "token", "text": shortcut["result"]}
+            yield {"type": "done"}
+            return
 
         for _ in range(MAX_TOOL_ITERATIONS):
             content_parts: list[str] = []

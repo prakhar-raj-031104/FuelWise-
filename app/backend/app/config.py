@@ -14,11 +14,14 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
-    # 1B is the latency-friendly default on CPU; set OLLAMA_MODEL=llama3.2 for
-    # higher answer quality at the cost of speed.
-    ollama_model: str = "llama3.2:1b"
-    # Keep the model warm in RAM between requests (avoids ~5s cold reloads).
+    # 3B (llama3.2) gives more accurate, instruction-following answers; with a
+    # single streamed generation it lands around ~5-7s on CPU (first token < ~1.5s).
+    # For maximum speed on weak hardware, set OLLAMA_MODEL=llama3.2:1b.
+    ollama_model: str = "llama3.2"
+    # Keep the model warm in RAM between requests (avoids cold reloads).
     ollama_keep_alive: str = "30m"
+    # Lower temperature = more factual, deterministic answers (e.g. allergy checks).
+    ollama_temperature: float = 0.3
     # Safety cap on answer length. Set generously so the model finishes its
     # answer naturally (a complete sentence) rather than being cut off mid-word;
     # the brevity instruction in the system prompt keeps answers short, so this

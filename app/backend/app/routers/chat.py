@@ -24,6 +24,7 @@ agent = MessMenuAgent(
     host=settings.ollama_host,
     keep_alive=settings.ollama_keep_alive,
     num_predict=settings.ollama_num_predict,
+    temperature=settings.ollama_temperature,
 )
 
 # session_id -> message history (includes the system prompt at index 0).

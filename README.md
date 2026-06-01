@@ -98,7 +98,7 @@ The first boot pulls the model (a few minutes / a couple of GB). When ready, ope
 **1. Start Ollama and pull the model**
 ```bash
 ollama serve
-ollama pull llama3.2:1b
+ollama pull llama3.2
 ```
 
 **2. Backend**
@@ -125,10 +125,11 @@ All settings are environment variables (see [`.env.example`](.env.example)):
 
 | Variable             | Default                          | Description                                                        |
 | -------------------- | -------------------------------- | ------------------------------------------------------------------ |
-| `OLLAMA_MODEL`       | `llama3.2:1b`                    | Model to use/pull. Set `llama3.2` for higher quality (slower).     |
+| `OLLAMA_MODEL`       | `llama3.2`                       | Model to use/pull. Set `llama3.2:1b` for more speed on weak hardware. |
 | `OLLAMA_HOST`        | `http://localhost:11434`         | Ollama endpoint (`http://ollama:11434` inside Compose).            |
 | `OLLAMA_KEEP_ALIVE`  | `30m`                            | Keeps the model warm in RAM to avoid cold-load latency.            |
-| `OLLAMA_NUM_PREDICT` | `128`                            | Max answer length — lower = faster on CPU.                         |
+| `OLLAMA_NUM_PREDICT` | `300`                            | Max answer length (safety cap; answers finish naturally below it). |
+| `OLLAMA_TEMPERATURE` | `0.3`                            | Sampling temperature — lower = more factual/deterministic.         |
 | `RATING_LOG`         | `/tmp/mess_menu_ratings.jsonl`   | Ratings file path (a Docker volume in production).                 |
 | `CORS_ORIGINS`       | `http://localhost:5173,http://localhost` | Comma-separated allowed frontend origins.                  |
 | `FRONTEND_PORT`      | `80`                             | Host port the web app is served on (Compose).                      |

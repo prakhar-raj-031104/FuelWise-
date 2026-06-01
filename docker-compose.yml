@@ -27,7 +27,7 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
-    command: ["ollama pull ${OLLAMA_MODEL:-llama3.2:1b}"]
+    command: ["ollama pull ${OLLAMA_MODEL:-llama3.2}"]
     restart: "no"
 
   backend:
@@ -39,7 +39,7 @@ services:
         condition: service_completed_successfully
     environment:
       OLLAMA_HOST: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       RATING_LOG: /data/mess_menu_ratings.jsonl
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:${FRONTEND_PORT:-80}}
     volumes:
